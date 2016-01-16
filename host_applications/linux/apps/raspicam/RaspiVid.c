@@ -80,6 +80,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <semaphore.h>
 
+#include <opencv2/core/core_c.h>
+#include <opencv2/objdetect/objdetect.hpp>
+#include <opencv2/highgui/highgui_c.h>
+#include <opencv2/imgproc/imgproc.hpp>
+
 // Standard port setting for the camera component
 #define MMAL_CAMERA_PREVIEW_PORT 0
 #define MMAL_CAMERA_VIDEO_PORT 1
@@ -99,6 +104,9 @@ const int MAX_BITRATE = 25000000; // 25Mbits/s
 /// Interval at which we check for an failure abort during capture
 const int ABORT_INTERVAL = 100; // ms
 
+// size of the opencv work image(s)
+const int MODECT_CV_WIDTH = 320;
+const int MODECT_CV_HEIGHT = 240;
 
 /// Capture/Pause switch method
 /// Simply capture for time specified
@@ -140,6 +148,11 @@ typedef struct
    int  header_wptr;
    FILE *imv_file_handle;               /// File handle to write inline motion vectors to.
    int  flush_buffers;
+
+   IplImage* modect_image; // resized image
+   IplImage* modect_stub;  // stub, so we can avoid a memcpy
+   int  modect;
+
 } PORT_USERDATA;
 
 /** Structure containing all state information for the current run
@@ -194,6 +207,9 @@ struct RASPIVID_STATE_S
    int settings;                        /// Request settings from the camera
    int sensor_mode;			            /// Sensor mode. 0=auto. Check docs/forum for modes selected by other values.
    int intra_refresh_type;              /// What intra refresh type to use. -1 to not set.
+
+   IplImage* modect_sub; // subtracted modect image
+   IplImage* modect_back; // background modect image
 };
 
 
@@ -260,6 +276,7 @@ static void display_valid_parameters(char *app_name);
 #define CommandSensorMode   26
 #define CommandIntraRefreshType 27
 #define CommandFlush        28
+#define CommandModect       29
 
 static COMMAND_LIST cmdline_commands[] =
 {
@@ -292,6 +309,7 @@ static COMMAND_LIST cmdline_commands[] =
    { CommandSensorMode,    "-mode",       "md", "Force sensor mode. 0=auto. See docs for other modes available", 1},
    { CommandIntraRefreshType,"-irefresh", "if", "Set intra refresh type", 1},
    { CommandFlush,         "-flush",      "fl",  "Flush buffers in order to decrease latency", 0 },
+   { CommandModect,        "-modect",     "mo",  "Run OpenCV motion detection", 0 },
 };
 
 static int cmdline_commands_size = sizeof(cmdline_commands) / sizeof(cmdline_commands[0]);
@@ -732,6 +750,14 @@ static int parse_cmdline(int argc, const char **argv, RASPIVID_STATE *state)
       {
          state->callback_data.flush_buffers = 1;
          break;
+      }
+
+      case CommandModect:
+      {
+        fprintf(stderr, "Starting motion detection...\n");
+        state->callback_data.modect = 1;
+
+        break;
       }
 
       default:
@@ -2085,6 +2111,15 @@ int main(int argc, const char **argv)
                fprintf(stderr, "Error opening output file: %s\nNo output file will be generated\n",state.imv_filename);
                state.inlineMotionVectors=0;
             }
+         }
+
+         if (state.callback_data.modect)
+         {
+            //init the opencv images
+            state.callback_data.modect_stub = cvCreateImage(cvSize(state.width, state.height), IPL_DEPTH_8U, 1);
+            state.callback_data.modect_image = cvCreateImage(cvSize(MODECT_CV_WIDTH, MODECT_CV_HEIGHT), IPL_DEPTH_8U, 1);
+            state.modect_sub = cvCreateImage(cvSize(MODECT_CV_WIDTH, MODECT_CV_HEIGHT), IPL_DEPTH_8U, 1);
+            state.modect_back = cvCreateImage(cvSize(MODECT_CV_WIDTH, MODECT_CV_HEIGHT), IPL_DEPTH_8U, 1);
          }
 
          if(state.bCircularBuffer)
