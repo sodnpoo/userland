@@ -719,7 +719,7 @@ int main(int argc, char** argv) {
           cvSub(back, fore, sub, NULL);
           cvCopy(fore, back, NULL);
           
-          //cvErode(sub, sub, NULL, 1);
+          cvErode(sub, sub, NULL, 1);
           
           cvCanny(sub, sub, 20, 60, 3);
           
@@ -739,7 +739,7 @@ int main(int argc, char** argv) {
           int n = cvCountNonZero(tmp);
           //fprintf(stderr, "N (%d)\n", n);
           //if(n>0){
-          int threshold = 30;
+          int threshold = 10;
           
           
           if(n>threshold){            
