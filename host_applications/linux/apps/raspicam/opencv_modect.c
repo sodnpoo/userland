@@ -1,4 +1,4 @@
-/* 
+/*
  * File:   opencv_modect.c
  * Author: lee@sodnpoo.com
  */
@@ -40,14 +40,14 @@
 #define CALC_FPS 1
 
 
-#define DEFAULT_VIDEO_FPS 30 
+#define DEFAULT_VIDEO_FPS 30
 #define DEFAULT_VIDEO_WIDTH 1280
 #define DEFAULT_VIDEO_HEIGHT 720
 
 
 //FPS: OpenCV = 15.05, Video = 30.51, ~60% CPU
 /*
-#define VIDEO_FPS 30 
+#define VIDEO_FPS 30
 #define VIDEO_WIDTH 1280
 #define VIDEO_HEIGHT 720
 */
@@ -56,7 +56,7 @@ const char* STILL_TMPFN = "/tmp/opencv_modect.jpg";
 
 /*
 //FPS: OpenCV = 14.90, Video = 30.02, ~75% CPU
-#define VIDEO_FPS 30 
+#define VIDEO_FPS 30
 #define VIDEO_WIDTH 1920
 #define VIDEO_HEIGHT 1080
 */
@@ -71,7 +71,7 @@ typedef struct {
     int width;
     int height;
     int fps;
-    
+
     MMAL_COMPONENT_T *camera;
     MMAL_COMPONENT_T *encoder;
     MMAL_COMPONENT_T *preview;
@@ -86,18 +86,18 @@ typedef struct {
     int opencv_width;
     int opencv_height;
     VCOS_SEMAPHORE_T complete_semaphore;
-    
+
     signed int motion;
     int grabframe;
 
     float video_fps;
     float opencv_fps;
-    
+
     IplImage* small_image; // resized image
     IplImage* stub; // stub
 
     char *stillfn; //place to write stills to
-    int rotation;    
+    int rotation;
 } PORT_USERDATA;
 
 int fill_port_buffer(MMAL_PORT_T *port, MMAL_POOL_T *pool) {
@@ -150,13 +150,13 @@ static void camera_video_buffer_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T
     //if(1){
     if(userdata->grabframe){
       mmal_buffer_header_mem_lock(buffer);
-      
+
       //monkey with the imageData pointer, to avoid a memcpy
       char* oldImageData = userdata->stub->imageData;
       userdata->stub->imageData = buffer->data;
       cvResize(userdata->stub, userdata->small_image, CV_INTER_LINEAR);
       userdata->stub->imageData = oldImageData;
-      
+
       mmal_buffer_header_mem_unlock(buffer);
 
       if (vcos_semaphore_trywait(&(userdata->complete_semaphore)) != VCOS_SUCCESS) {
@@ -171,7 +171,7 @@ static void camera_video_buffer_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T
 
       fprintf(stderr, "WRITING STILL (%d)\n", frame_count);
 /*
-      //Just grab the Y and write it out ASAP      
+      //Just grab the Y and write it out ASAP
       //monkey with the imageData pointer, to avoid a memcpy
       char* oldImageData = userdata->stub->imageData;
       userdata->stub->imageData = buffer->data;
@@ -198,9 +198,9 @@ static void camera_video_buffer_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T
       cvResize(&v, vv, CV_INTER_LINEAR);
       IplImage* yy = cvCreateImage(cvSize(userdata->width, userdata->height), IPL_DEPTH_8U, 1);
       cvResize(&y, yy, CV_INTER_LINEAR);
-      //Create the final, 3 channel image      
+      //Create the final, 3 channel image
       IplImage* image = cvCreateImage(cvSize(userdata->width, userdata->height), IPL_DEPTH_8U, 3);
-      CvArr * output[] = { image };      
+      CvArr * output[] = { image };
       //map Y to the 1st channel
       int from_to[] = {0, 0};
       const CvArr * inputy[] = { yy };
@@ -213,7 +213,7 @@ static void camera_video_buffer_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T
       from_to[1] = 2;
       const CvArr * inputu[] = { uu };
       cvMixChannels(inputu, 1, output, 1, from_to, 1);
-      //convert the colour space      
+      //convert the colour space
       cvCvtColor(image, image, CV_YCrCb2BGR);
       //save the image
       cvSaveImage(STILL_TMPFN, image, 0);
@@ -222,8 +222,8 @@ static void camera_video_buffer_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T
       cvReleaseImage(&vv);
       cvReleaseImage(&uu);
       cvReleaseImage(&image);
-/**/ 
-      
+/**/
+
       mmal_buffer_header_mem_unlock(buffer);
 
       rename(STILL_TMPFN, userdata->stillfn);
@@ -235,14 +235,14 @@ static void camera_video_buffer_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T
     }
 
     if(1){
-    //if(userdata->motion > 0){   
+    //if(userdata->motion > 0){
       MMAL_BUFFER_HEADER_T *output_buffer = mmal_queue_get(userdata->encoder_input_pool->queue);
       if(output_buffer){
         mmal_buffer_header_mem_lock(buffer);
         memcpy(output_buffer->data, buffer->data, buffer->length);
         output_buffer->length = buffer->length;
         mmal_buffer_header_mem_unlock(buffer);
-              
+
         if (mmal_port_send_buffer(userdata->encoder_input_port, output_buffer) != MMAL_SUCCESS) {
           fprintf(stderr, "ERROR: Unable to send buffer \n");
         }
@@ -286,23 +286,23 @@ static void encoder_output_buffer_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER
       fwrite(buffer->data, 1, buffer->length, stdout);
       mmal_buffer_header_mem_unlock(buffer);
       /*
-      //write out epoch:framenum      
+      //write out epoch:framenum
       static int frame_count = 0;
       if(buffer->flags & MMAL_BUFFER_HEADER_FLAG_KEYFRAME)
       {
         time_t now = time(NULL);
         fprintf(stderr, "KEYFRAME (%d:%d)\n", now, frame_count);
-      }      
-      
+      }
+
       if(buffer->flags & MMAL_BUFFER_HEADER_FLAG_FRAME_END)
       {
         frame_count++;
       }
-      */     
+      */
     }
 
     mmal_buffer_header_release(buffer);
-    
+
     if (port->is_enabled) {
         MMAL_STATUS_T status;
 
@@ -376,7 +376,7 @@ int setup_camera(PORT_USERDATA *userdata) {
         mmal_port_parameter_set(camera->control, &cam_config.hdr);
     }
 
-    // Setup camera preview port format 
+    // Setup camera preview port format
     format = camera_preview_port->format;
     //format->encoding = MMAL_ENCODING_I420;
     format->encoding = MMAL_ENCODING_OPAQUE;
@@ -480,7 +480,7 @@ int setup_encoder(PORT_USERDATA *userdata) {
 
     encoder_output_port->buffer_size = encoder_output_port->buffer_size_recommended;
     encoder_output_port->buffer_num = 2;
-    // Commit the port changes to the input port 
+    // Commit the port changes to the input port
     status = mmal_port_format_commit(encoder_input_port);
     if (status != MMAL_SUCCESS) {
         fprintf(stderr, "Error: unable to commit encoder input port format (%u)\n", status);
@@ -503,7 +503,7 @@ int setup_encoder(PORT_USERDATA *userdata) {
         encoder_output_port->buffer_num = encoder_output_port->buffer_num_min;
     }
 
-    // Commit the port changes to the output port    
+    // Commit the port changes to the output port
     status = mmal_port_format_commit(encoder_output_port);
     if (status != MMAL_SUCCESS) {
         fprintf(stderr, "Error: unable to commit encoder output port format (%u)\n", status);
@@ -535,7 +535,7 @@ int setup_encoder(PORT_USERDATA *userdata) {
         fprintf(stderr, "Error: unable to enable encoder output port (%u)\n", status);
         return -1;
     }
-    fprintf(stderr, "encoder output pool has been created\n");    
+    fprintf(stderr, "encoder output pool has been created\n");
 
     fill_port_buffer(encoder_output_port, encoder_output_port_pool);
 
@@ -559,17 +559,17 @@ static void update_annotation_data(MMAL_COMPONENT_T *camera_component)
   struct tm tm = *localtime(&t);
   char tmp[MMAL_CAMERA_ANNOTATE_MAX_TEXT_LEN_V3];
   strftime(tmp, MMAL_CAMERA_ANNOTATE_MAX_TEXT_LEN_V3, "%F %T", &tm );
-  
-  
+
+
   char *hostname = "bernard";
   char *text;
   asprintf(&text, " %s@ %s ", hostname, tmp);
-  
+
 
   int settings = 0x0;
   settings |= ANNOTATE_USER_TEXT;
   settings |= ANNOTATE_BLACK_BACKGROUND;
-  
+
   int bg_colour = -1;
   int fg_colour = -1;
 
@@ -585,7 +585,7 @@ int main(int argc, char** argv) {
 
     userdata.width = DEFAULT_VIDEO_WIDTH;
     userdata.height = DEFAULT_VIDEO_HEIGHT;
-    userdata.fps = DEFAULT_VIDEO_FPS;    
+    userdata.fps = DEFAULT_VIDEO_FPS;
 
     int c;
     opterr = 0;
@@ -652,19 +652,19 @@ int main(int argc, char** argv) {
     IplImage* sub = NULL;
     IplImage* gray = NULL;
     IplImage* mask = NULL;
-    
+
     IplImage* tmp = NULL;
 
     sub = cvCreateImage(cvSize(userdata.opencv_width, userdata.opencv_height), IPL_DEPTH_8U, 1);
     back = cvCreateImage(cvSize(userdata.opencv_width, userdata.opencv_height), IPL_DEPTH_8U, 1);
     gray = cvCreateImage(cvSize(userdata.opencv_width, userdata.opencv_height), IPL_DEPTH_8U, 1);
     tmp = cvCreateImage(cvSize(userdata.opencv_width, userdata.opencv_height), IPL_DEPTH_8U, 1);
-    
+
     char *maskfn = "/home/pi/mask.png";
     mask = cvLoadImage(maskfn, CV_LOAD_IMAGE_GRAYSCALE );
     if(!mask){
         fprintf(stderr, "couldn't load mask");
-        return -1;    
+        return -1;
     }
 
     userdata.small_image = cvCreateImage(cvSize(userdata.opencv_width, userdata.opencv_height), IPL_DEPTH_8U, 1);
@@ -701,28 +701,28 @@ int main(int argc, char** argv) {
             }
 
             fprintf(stderr, "FPS: OpenCV = %.2f, Video = %.2f\n", userdata.opencv_fps, userdata.video_fps);
-            
+
             update_annotation_data(userdata.camera);
-           
+
           }
-        
+
           fore = userdata.small_image;
 
           if(!back){
             cvCopy(fore, back, NULL);
           }
-                    
+
           //cv2.blur(fore, tmp);
-          
+
           cvSmooth(fore, fore, CV_GAUSSIAN, 3, 0, 0, 0);
-          
+
           cvSub(back, fore, sub, NULL);
           cvCopy(fore, back, NULL);
-          
+
           cvErode(sub, sub, NULL, 1);
-          
+
           cvCanny(sub, sub, 20, 60, 3);
-          
+
           cvCopy(sub, tmp, mask);
 /*
           //DUMP steps to files
@@ -735,20 +735,20 @@ int main(int argc, char** argv) {
           cvSaveImage(fn, back, 0);
           count++;
 */
-         
+
           int n = cvCountNonZero(tmp);
           //fprintf(stderr, "N (%d)\n", n);
           //if(n>0){
           int threshold = 10;
-          
-          
-          if(n>threshold){            
-          
+
+
+          if(n>threshold){
+
             if(userdata.motion < 0){
               fprintf(stderr, "START (%d)\n", n);
               signal_start();
             }
-          
+
             userdata.motion = (userdata.fps * 15) + threshold; //number of seconds to capture after detection
             fprintf(stderr, "MOTION DETECTED (%d)\n", n);
           }else{
@@ -770,4 +770,3 @@ int main(int argc, char** argv) {
 
     return 0;
 }
-
