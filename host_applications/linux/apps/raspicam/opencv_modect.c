@@ -553,18 +553,15 @@ void signal_stop(){
   system(cmd);
 }
 
-static void update_annotation_data(MMAL_COMPONENT_T *camera_component)
+static void update_annotation_data(MMAL_COMPONENT_T *camera_component, char *hostname)
 {
   time_t t = time(NULL);
   struct tm tm = *localtime(&t);
   char tmp[MMAL_CAMERA_ANNOTATE_MAX_TEXT_LEN_V3];
   strftime(tmp, MMAL_CAMERA_ANNOTATE_MAX_TEXT_LEN_V3, "%F %T", &tm );
 
-
-  char *hostname = "bernard";
   char *text;
   asprintf(&text, " %s@ %s ", hostname, tmp);
-
 
   int settings = 0x0;
   settings |= ANNOTATE_USER_TEXT;
@@ -681,6 +678,9 @@ int main(int argc, char** argv) {
     s.tv_sec = 0;
     s.tv_nsec = 30000000;
 
+    char hostname[1024];
+    gethostname(hostname, 1024);
+
     while (1) {
 
       //nanosleep(&s, NULL);
@@ -702,7 +702,7 @@ int main(int argc, char** argv) {
 
             fprintf(stderr, "FPS: OpenCV = %.2f, Video = %.2f\n", userdata.opencv_fps, userdata.video_fps);
 
-            update_annotation_data(userdata.camera);
+            update_annotation_data(userdata.camera, hostname);
 
           }
 
